@@ -1,20 +1,29 @@
 {
   "version": "2.0.0",
   "tasks": [
-    { // 安装依赖
+    {
       "label": "install",
       "type": "shell",
-      "command": "pip install esptool.py nodemcu-uploader"
+      "command": "pip install esptool.py nodemcu-uploader",
+      "problemMatcher": []
     },
-    { // 擦除闪存
+    {
       "label": "flash",
       "type": "shell",
-      "command": "esptool.py --port /dev/tty.wch* erase_flash; esptool.py --port /dev/tty.wch* write_flash -fm dio -fs 32m -ff 40m 0x00000 firmware.bin"
+      "command": "esptool.py --port /dev/tty.wch* erase_flash; esptool.py --port /dev/tty.wch* write_flash -fm dio -fs 32m -ff 40m 0x00000 firmware.bin; screen /dev/tty.wch* 115200",
+      "problemMatcher": []
     },
-    { // 上传所有脚本
-      "label": "upload",
+    {
+      "label": "shell",
       "type": "shell",
-      "command": "nodemcu-uploader --port /dev/tty.wch* upload *.lua --verify=sha1; nodemcu-uploader --port /dev/tty.wch* node restart; screen /dev/tty.wch* 115200"
+      "command": "screen /dev/tty.wch* 115200",
+      "problemMatcher": []
+    },
+    {
+      "label": "sync",
+      "type": "shell",
+      "command": "nodemcu-uploader --port /dev/tty.wch* upload *.lua; nodemcu-uploader --port /dev/tty.wch* node restart; screen /dev/tty.wch* 115200",
+      "problemMatcher": []
     }
   ]
 }

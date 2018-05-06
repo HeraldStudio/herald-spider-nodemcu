@@ -1,4 +1,5 @@
 dofile('config.lua')
+dofile('proxy.lua')
 
 -- 各状态定义
 STATE_INITIAL = 0
@@ -24,14 +25,14 @@ transform[STATE_INITIAL] = {
       print('Wi-Fi 连接成功')
       wifi.eventmon.unregister(wifi.eventmon.STA_CONNECTED)
       wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(t)
-        print('Wi-Fi 已分配 IP 地址：'..wifi.sta.getip())
+        wifi.ap.config({ ssid = 'NodeMCU丨'..wifi.sta.getip(), pwd = 'esp8266ex' })
         wifi.eventmon.unregister(wifi.eventmon.STA_GOT_IP)
         state = STATE_WIFI_CONNECTED
       end)
     end)
   end,
   run = function()
-    wifi.setmode(wifi.STATION)
+    wifi.setmode(wifi.STATIONAP)
     wifi.sta.config({ ssid = 'seu-wlan' })
     wifi.sta.autoconnect(1)
   end,
@@ -67,7 +68,7 @@ transform[STATE_WIFI_CONNECTED] = {
 transform[STATE_WIFI_AUTHORIZED] = {
   run = function()
     local data = sjson.encode({ cardnum = cardnum, password = password, platform = 'repl' })
-    http.post('https://myseu.cn/ws3/auth', 'Content-Type: application/json\r\n', data, function(_, res)
+    http.post('http://myseu.cn/ws3/auth', 'Content-Type: application/json\r\n', data, function(_, res)
       ok, res = pcall(sjson.decode, res)
       if (ok and res.code == 200) then
         print('Token 获取成功')
@@ -135,12 +136,10 @@ transform[STATE_WS_AUTHORIZED] = {
     ws:on('receive', function(_, msg)
       local ok, msg = pcall(sjson.decode, msg)
       if (ok) then
-        -- 模拟 axios 的行为；暂无实现
-        print(msg.requestName)
-        print(msg.method)
-        print(msg.url)
-        print(msg.data.data)
-        print(msg.cookie)
+        proxy(msg, function(res)
+          local ok, msg = pcall(sjson.encode, res)
+          ws:send(msg)
+        end)
       end
     end)
   end,
@@ -157,19 +156,19 @@ prevState = -1
 tmr.create():alarm(100, tmr.ALARM_AUTO, function()
   if (prevState ~= state) then
     if (state ~= STATE_RETRY) then
-      if (transform[prevState] ~= nil and transform[prevState].leave ~= nil) then
+      if (type(transform[prevState]) == 'table' and type(transform[prevState].leave) == 'function') then
         transform[prevState].leave()
       end
       prevState = state
-      if (transform[state] ~= nil and transform[state].enter ~= nil) then
+      if (type(transform[state]) == 'table' and type(transform[state].enter) == 'function') then
         transform[state].enter()
       end
     else
       state = prevState
     end
-    if (transform[state] ~= nil and transform[state].run ~= nil) then
+    if (type(transform[state]) == 'table' and type(transform[state].run) == 'function') then
       transform[state].run()
-    elseif (transform[state] ~= nil) then
+    elseif (type(transform[state]) == 'function') then
       transform[state]()
     end
   end
